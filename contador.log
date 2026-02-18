@@ -1,0 +1,39 @@
+2026-02-18 13:07:29,161 [INFO] Cargando modelo YOLO: yolov8s.pt
+2026-02-18 13:07:29,161 [INFO] Aplicacion iniciada.
+2026-02-18 13:07:29,237 [INFO] Modelo cargado correctamente.
+2026-02-18 13:07:43,376 [INFO] Deteccion iniciada (camara 0).
+2026-02-18 13:07:45,306 [INFO] Camara 0 abierta.
+2026-02-18 13:07:45,306 [ERROR] Error critico en hilo de video: property 'in_count' of 'LineZone' object has no setter
+Traceback (most recent call last):
+  File "c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\realtime_detector_personas.py", line 568, in _video_loop
+    self.counter.setup_line(w, h)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\realtime_detector_personas.py", line 102, in setup_line
+    self._create_line_zone()
+    ~~~~~~~~~~~~~~~~~~~~~~^^
+  File "c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\realtime_detector_personas.py", line 119, in _create_line_zone
+    self.line_zone.in_count = self.in_count
+    ^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: property 'in_count' of 'LineZone' object has no setter
+2026-02-18 13:07:45,312 [INFO] Hilo de video finalizado.
+2026-02-18 13:09:34,854 [INFO] Cargando modelo YOLO: yolov8s.pt
+2026-02-18 13:09:34,854 [INFO] Aplicacion iniciada.
+2026-02-18 13:09:34,921 [INFO] Modelo cargado correctamente.
+2026-02-18 13:09:40,100 [INFO] Deteccion iniciada (camara 0).
+2026-02-18 13:09:41,974 [INFO] Camara 0 abierta.
+2026-02-18 13:10:54,251 [INFO] CSV exportado: C:/Users/camil/Downloads/conteo_2026-02-18_131046.csv (1 filas)
+2026-02-18 13:12:35,250 [INFO] Deteccion detenida.
+2026-02-18 13:12:35,589 [INFO] Hilo de video finalizado.
+2026-02-18 13:12:47,057 [INFO] Deteccion iniciada (camara 0).
+2026-02-18 13:12:48,707 [INFO] Camara 0 abierta.
+2026-02-18 13:13:35,890 [INFO] Deteccion detenida.
+2026-02-18 13:13:36,257 [INFO] Hilo de video finalizado.
+2026-02-18 13:13:39,467 [INFO] Deteccion iniciada (camara 0).
+2026-02-18 13:13:41,069 [INFO] Camara 0 abierta.
+2026-02-18 13:14:34,862 [INFO] CSV exportado: C:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-18.csv (1 filas)
+2026-02-18 13:14:34,863 [INFO] Auto-guardado: C:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-18.csv
+2026-02-18 13:15:12,957 [INFO] Contadores reiniciados.
+2026-02-18 13:15:12,959 [INFO] Contadores reiniciados por el usuario.
+2026-02-18 13:15:22,660 [INFO] Cerrando aplicacion...
+2026-02-18 13:15:23,021 [INFO] Hilo de video finalizado.
+2026-02-18 13:15:23,072 [INFO] Aplicacion cerrada.
