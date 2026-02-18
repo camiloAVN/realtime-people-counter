@@ -1,8 +1,8 @@
 # Contador de Personas en Tiempo Real
 
-Sistema de conteo de personas en tiempo real usando YOLO + ByteTrack. Detecta personas por webcam y cuenta cuantas cruzan una linea configurable.
+Sistema de conteo de personas en tiempo real con interfaz grafica (Tkinter). Usa YOLO + ByteTrack para detectar personas por webcam y contar cuantas cruzan una linea configurable.
 
-Pensado para medir el trafico de visitantes en un stand de feria o evento.
+Pensado para medir el trafico de visitantes en un stand de feria o evento durante sesiones prolongadas (8-10 horas).
 
 ## Como funciona
 
@@ -10,11 +10,39 @@ Pensado para medir el trafico de visitantes en un stand de feria o evento.
 2. **ByteTrack** asigna un ID unico a cada persona y la sigue entre frames
 3. **LineZone** detecta cuando una persona cruza la linea de conteo
 4. Se registran **entradas** y **salidas** por separado
+5. Los datos se guardan automaticamente en **CSV** cada 5 minutos
+
+## Interfaz
+
+```
++----------------------------------------------+
+|  Contador de Personas - Stand Feria          |
++---------------------------+------------------+
+|                           | ENTRADAS:  42    |
+|                           | SALIDAS:   38    |
+|    VIDEO FEED             | EN CUADRO:  3    |
+|    (640x480)              | FPS: 25.3        |
+|    con linea y boxes      |------------------|
+|                           | [Iniciar]        |
+|                           | [Detener]        |
+|                           | [Reiniciar]      |
+|                           | [Exportar CSV]   |
+|                           |------------------|
+|                           | Camara: [0]      |
+|                           | Confianza: ===o  |
+|                           | Pos. linea: ==o  |
+|                           | Orien: (H) (V)  |
+|                           |------------------|
+|                           | Trafico por hora |
+|                           | ## ## #### ##    |
++---------------------------+------------------+
+```
 
 ## Requisitos
 
 - Python 3.10+
 - Webcam
+- GPU con CUDA (recomendado, no obligatorio)
 
 ## Instalacion
 
@@ -41,65 +69,63 @@ El modelo YOLO se descarga automaticamente en la primera ejecucion.
 ## Uso
 
 ```bash
-# Ejecucion basica (linea horizontal al 50% de la pantalla)
-python realtime_detector_personas.py webcam
+python realtime_detector_personas.py
 ```
 
-### Opciones
+Se abre la ventana de la aplicacion. Click en **Iniciar** para comenzar la deteccion.
 
-| Opcion           | Default        | Descripcion                                              |
-|------------------|----------------|----------------------------------------------------------|
-| `--model`        | `yolov8s.pt`   | Modelo YOLO a usar                                       |
-| `--camera`       | `0`            | Indice de la camara                                      |
-| `--confidence`   | `0.3`          | Umbral de confianza minimo (0.0 a 1.0)                   |
-| `--line-pos`     | `0.5`          | Posicion relativa de la linea de conteo (0.0 a 1.0)      |
-| `--orientation`  | `horizontal`   | Orientacion de la linea: `horizontal` o `vertical`       |
+## Controles de la GUI
 
-### Modelos disponibles
+| Control | Funcion |
+|---------|---------|
+| Iniciar | Arranca captura de video y deteccion |
+| Detener | Pausa la deteccion |
+| Reiniciar contadores | Pone conteos en 0, nuevo tracker |
+| Exportar CSV | Guarda archivo CSV con dialogo de ubicacion |
+| Slider confianza | 0.1 a 0.9, se actualiza en vivo |
+| Slider posicion linea | 0.0 a 1.0, se actualiza en vivo |
+| Orientacion | Horizontal / Vertical |
+| Selector camara | Indices 0-4 para seleccionar camara |
 
-| Modelo         | Velocidad | Precision | Recomendado para                |
-|----------------|-----------|-----------|----------------------------------|
-| `yolov8n.pt`   | Rapido    | Baja      | PCs sin GPU dedicada             |
-| `yolov8s.pt`   | Medio     | Media     | Uso general (default)            |
-| `yolov8m.pt`   | Lento     | Alta      | Cuando la precision es prioridad |
+## Datos CSV
 
-### Posicion de la linea (`--line-pos`)
+Se genera automaticamente un archivo `conteo_YYYY-MM-DD.csv` con las columnas:
 
-Valor entre 0.0 y 1.0 que indica la posicion relativa en la pantalla:
+| Columna | Descripcion |
+|---------|-------------|
+| `hora` | Hora del registro (HH:MM) |
+| `entradas_intervalo` | Entradas en los ultimos 15 min |
+| `salidas_intervalo` | Salidas en los ultimos 15 min |
+| `entradas_total` | Entradas acumuladas |
+| `salidas_total` | Salidas acumuladas |
 
-```
-Horizontal:  0.0 = arriba     →  1.0 = abajo
-Vertical:    0.0 = izquierda  →  1.0 = derecha
-```
+- Se registra una fila cada 15 minutos
+- Auto-guardado cada 5 minutos
+- Guardado automatico al cerrar la aplicacion
+- Exportacion manual con el boton "Exportar CSV"
 
-### Ejemplos
+## Estabilidad para uso prolongado
 
-```bash
-# Linea horizontal al 70% (mas abajo)
-python realtime_detector_personas.py webcam --line-pos 0.7
+- **Reconexion automatica de camara**: Si la camara se desconecta, reintenta cada 3 segundos y muestra un aviso en pantalla
+- **Reset periodico del tracker**: Cada 30 minutos se limpia ByteTrack para evitar acumulacion de memoria (los conteos se preservan)
+- **Auto-guardado**: Snapshot CSV cada 5 minutos por si se cierra la app inesperadamente
+- **Cierre limpio**: Al cerrar la ventana se guardan los datos automaticamente
+- **Logging**: Errores y eventos se registran en `contador.log`
 
-# Linea vertical para entrada de un stand
-python realtime_detector_personas.py webcam --orientation vertical --line-pos 0.4
+## Modelos disponibles
 
-# Modelo rapido para PC sin GPU + camara externa
-python realtime_detector_personas.py webcam --model yolov8n.pt --camera 1
+| Modelo | Velocidad | Precision | Recomendado para |
+|--------|-----------|-----------|------------------|
+| `yolov8n.pt` | Rapido | Baja | PCs sin GPU dedicada |
+| `yolov8s.pt` | Medio | Media | Uso general (default) |
+| `yolov8m.pt` | Lento | Alta | Cuando la precision es prioridad |
 
-# Mayor confianza para reducir falsos positivos
-python realtime_detector_personas.py webcam --confidence 0.5
-```
-
-## Controles en vivo
-
-| Tecla | Accion                    |
-|-------|---------------------------|
-| `q`   | Salir                     |
-| `r`   | Reiniciar contadores a 0  |
-
-Al salir se muestra un resumen con el total de entradas y salidas.
+Para cambiar el modelo, editar la constante en el codigo (`model_name` en `PersonCounter`).
 
 ## Recomendaciones para el stand
 
 - Colocar la camara apuntando a la **entrada del stand**
 - Usar orientacion **vertical** con la linea en el marco de la entrada
-- Probar diferentes valores de `--line-pos` hasta que la linea coincida con la entrada
-- Si hay mucho movimiento y la PC es lenta, usar `--model yolov8n.pt`
+- Ajustar el slider de posicion de linea hasta que coincida con la entrada
+- Si hay mucho movimiento y la PC es lenta, editar el modelo a `yolov8n.pt`
+- Dejar la aplicacion corriendo todo el dia; el CSV se guarda solo
