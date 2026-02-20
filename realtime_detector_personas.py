@@ -284,6 +284,9 @@ class CounterApp(tk.Tk):
         # Motor de deteccion
         self.counter = PersonCounter()
 
+        # Canvas image item (evita parpadeo al usar itemconfig en vez de delete+create)
+        self._canvas_image_id = None
+
         # Auto-guardado
         self._autosave_interval = 5 * 60 * 1000  # 5 minutos en ms
         self._csv_dir = os.path.dirname(os.path.abspath(__file__))
@@ -505,9 +508,11 @@ class CounterApp(tk.Tk):
             return
         self._running = False
         self._stop_event.set()
+        self._canvas_image_id = None  # Permite redibujar placeholder al reiniciar
         self.btn_start.configure(state="normal")
         self.btn_stop.configure(state="disabled")
         self.lbl_status.configure(text="Estado: Detenido", fg="#ffaa00")
+        self._draw_placeholder("Presione 'Iniciar' para comenzar")
         logger.info("Deteccion detenida.")
 
     def _reset_counters(self):
@@ -605,15 +610,56 @@ class CounterApp(tk.Tk):
             logger.info("Hilo de video finalizado.")
 
     def _open_camera(self, index: int):
-        """Intenta abrir la camara. Devuelve None si falla."""
-        try:
-            cap = cv2.VideoCapture(index)
-            if cap.isOpened():
-                logger.info("Camara %d abierta.", index)
+        """Intenta abrir la camara. Devuelve None si falla.
+
+        Prueba primero DirectShow (DSHOW) en Windows, que es mas estable para
+        camaras USB como la Logitech C922. Si falla, intenta el backend por defecto.
+        Ademas:
+          - Fija el buffer interno a 1 frame para evitar acumulacion de frames atrasados.
+          - Lee varios frames de calentamiento hasta obtener uno valido, ya que la
+            C922 necesita un momento para inicializar el sensor tras ser abierta.
+        """
+        WARMUP_ATTEMPTS = 20
+        WARMUP_DELAY   = 0.05  # segundos entre intentos
+
+        # En Windows, DSHOW es mas confiable para webcams USB; usar como primer intento
+        backends = [cv2.CAP_DSHOW, cv2.CAP_ANY]
+
+        for backend in backends:
+            try:
+                cap = cv2.VideoCapture(index, backend)
+                if not cap.isOpened():
+                    cap.release()
+                    continue
+
+                # Reducir buffer interno para no leer frames acumulados (causa de parpadeo)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+                # Calentamiento: esperar hasta obtener un frame valido
+                warmed = False
+                for attempt in range(WARMUP_ATTEMPTS):
+                    ret, _ = cap.read()
+                    if ret:
+                        warmed = True
+                        break
+                    time.sleep(WARMUP_DELAY)
+
+                if not warmed:
+                    logger.warning(
+                        "Camara %d (backend %d): no produjo frames en calentamiento.",
+                        index, backend,
+                    )
+                    cap.release()
+                    continue
+
+                backend_name = "DSHOW" if backend == cv2.CAP_DSHOW else "AUTO"
+                logger.info("Camara %d abierta con backend %s.", index, backend_name)
                 return cap
-            cap.release()
-        except Exception as e:
-            logger.error("Error abriendo camara %d: %s", index, e)
+
+            except Exception as e:
+                logger.error("Error abriendo camara %d con backend %d: %s", index, backend, e)
+
+        logger.error("No se pudo abrir la camara %d con ningun backend.", index)
         return None
 
     def _show_disconnected_frame(self):
@@ -653,8 +699,15 @@ class CounterApp(tk.Tk):
             try:
                 img = Image.fromarray(frame)
                 self._photo_image = ImageTk.PhotoImage(image=img)
-                self.video_canvas.delete("all")
-                self.video_canvas.create_image(0, 0, anchor="nw", image=self._photo_image)
+                if self._canvas_image_id is None:
+                    # Primera vez: crear el item de imagen en el canvas
+                    self._canvas_image_id = self.video_canvas.create_image(
+                        0, 0, anchor="nw", image=self._photo_image
+                    )
+                else:
+                    # Actualizaciones siguientes: modificar el item existente sin borrar
+                    # Esto elimina el flash negro que causaba el parpadeo visible
+                    self.video_canvas.itemconfig(self._canvas_image_id, image=self._photo_image)
             except Exception:
                 pass
 
