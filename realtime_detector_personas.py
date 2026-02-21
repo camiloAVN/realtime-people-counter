@@ -120,7 +120,15 @@ class PersonCounter:
         if self.line_zone is not None:
             self._in_offset += self.line_zone.in_count
             self._out_offset += self.line_zone.out_count
-        self.line_zone = sv.LineZone(start=start, end=end)
+        # Usar solo el centroide como punto de cruce.
+        # El default (4 esquinas del bounding box) dispara el conteo cuando
+        # cualquier esquina toca la linea, lo que con camaras cercanas hace
+        # que se cuente antes de que la persona haya realmente pasado.
+        self.line_zone = sv.LineZone(
+            start=start,
+            end=end,
+            triggering_anchors=[sv.Position.CENTER],
+        )
 
     def _create_tracker(self):
         """Crea un nuevo tracker ByteTrack."""
@@ -187,6 +195,15 @@ class PersonCounter:
                 scene=frame, detections=detections, labels=labels
             )
         frame = self.line_annotator.annotate(frame=frame, line_counter=self.line_zone)
+
+        # Dibujar centroide de cada deteccion para confirmar visualmente
+        # que ese es el punto que dispara el cruce de linea
+        if len(detections) > 0 and detections.xyxy is not None:
+            for box in detections.xyxy:
+                cx = int((box[0] + box[2]) / 2)
+                cy = int((box[1] + box[3]) / 2)
+                cv2.circle(frame, (cx, cy), 5, (0, 255, 255), -1)   # relleno amarillo
+                cv2.circle(frame, (cx, cy), 7, (0, 180, 180), 1)    # contorno
 
         # FPS
         elapsed = time.perf_counter() - t_start
