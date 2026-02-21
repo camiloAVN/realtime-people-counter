@@ -58,7 +58,10 @@ class PersonCounter:
         self.line_position = line_position
         self.line_orientation = line_orientation
 
-        # Estadisticas
+        # Modo de conteo: "line" (cruce de linea) | "fov" (campo de vision)
+        self.counting_mode = "line"
+
+        # Estadisticas modo linea
         self.in_count = 0
         self.out_count = 0
         self._in_offset = 0   # Acumulado de LineZones anteriores
@@ -66,11 +69,20 @@ class PersonCounter:
         self.persons_in_frame = 0
         self.fps = 0.0
 
-        # Datos por intervalo (cada 15 min)
-        self.interval_data = []  # [(hora_str, in_intervalo, out_intervalo, in_total, out_total)]
+        # Estadisticas modo campo de vision (FOV)
+        self.fov_count = 0          # Personas unicas vistas desde el inicio/reset
+        self._fov_offset = 0        # Acumulado antes de resets del tracker
+        self._seen_ids = set()      # IDs vistos en el ciclo actual del tracker
+
+        # Datos por intervalo (cada 15 min) - compartido entre modos
+        # Formato: (hora_str, val_intervalo, val2_intervalo, total, total2)
+        #   linea: (hora, in_intervalo, out_intervalo, in_total, out_total)
+        #   fov:   (hora, personas_intervalo, 0, personas_total, 0)
+        self.interval_data = []
         self._last_interval_time = None
         self._interval_in_start = 0
         self._interval_out_start = 0
+        self._interval_fov_start = 0
 
         # Datos por hora para el grafico
         self.hourly_entries = {}  # {hora_int: entradas}
@@ -139,6 +151,25 @@ class PersonCounter:
         )
         self._tracker_reset_time = time.time()
 
+    def _periodic_tracker_reset(self):
+        """Reset automatico cada 30 min para liberar memoria.
+
+        En modo FOV, antes de reiniciar el tracker se preserva el conteo de
+        IDs unicos vistos en este ciclo sumandolos al offset acumulado.
+        Los IDs en ByteTrack se reinician desde 1, por lo que sin este
+        mecanismo se perderia la cuenta entre ciclos.
+        """
+        logger.info("Reset periodico del tracker (cada 30 min).")
+        if self.counting_mode == "fov":
+            self._fov_offset += len(self._seen_ids)
+            self._seen_ids = set()
+        self._create_tracker()
+
+    def set_mode(self, mode: str):
+        """Cambia el modo de conteo sin resetear los acumulados."""
+        self.counting_mode = mode
+        logger.info("Modo de conteo cambiado a: %s", mode)
+
     def update_line(self, position: float, orientation: str):
         """Actualiza la posicion/orientacion de la linea en vivo."""
         self.line_position = position
@@ -158,8 +189,7 @@ class PersonCounter:
 
         # Reset periodico del tracker para liberar memoria
         if time.time() - self._tracker_reset_time > self._tracker_reset_interval:
-            logger.info("Reset periodico del tracker (cada 30 min).")
-            self._create_tracker()
+            self._periodic_tracker_reset()
 
         # Deteccion YOLO
         results = self.model(
@@ -170,16 +200,20 @@ class PersonCounter:
         # Tracking
         detections = self.tracker.update_with_detections(detections)
 
-        # Conteo de cruce de linea
-        self.line_zone.trigger(detections=detections)
-        self.in_count = self._in_offset + self.line_zone.in_count
-        self.out_count = self._out_offset + self.line_zone.out_count
+        # --- Conteo segun el modo activo ---
+        if self.counting_mode == "fov":
+            self._update_fov_count(detections)
+        else:
+            self.line_zone.trigger(detections=detections)
+            self.in_count = self._in_offset + self.line_zone.in_count
+            self.out_count = self._out_offset + self.line_zone.out_count
+
         self.persons_in_frame = len(detections)
 
         # Registrar intervalo cada 15 min
         self._check_interval()
 
-        # Etiquetas
+        # Etiquetas de tracker ID
         labels = []
         if detections.tracker_id is not None:
             labels = [
@@ -187,23 +221,25 @@ class PersonCounter:
                 for tid, conf in zip(detections.tracker_id, detections.confidence)
             ]
 
-        # Anotar frame
+        # Anotaciones comunes
         frame = self.trace_annotator.annotate(scene=frame, detections=detections)
         frame = self.box_annotator.annotate(scene=frame, detections=detections)
         if labels:
             frame = self.label_annotator.annotate(
                 scene=frame, detections=detections, labels=labels
             )
-        frame = self.line_annotator.annotate(frame=frame, line_counter=self.line_zone)
 
-        # Dibujar centroide de cada deteccion para confirmar visualmente
-        # que ese es el punto que dispara el cruce de linea
+        # Linea solo en modo linea
+        if self.counting_mode == "line":
+            frame = self.line_annotator.annotate(frame=frame, line_counter=self.line_zone)
+
+        # Centroide visible en ambos modos
         if len(detections) > 0 and detections.xyxy is not None:
             for box in detections.xyxy:
                 cx = int((box[0] + box[2]) / 2)
                 cy = int((box[1] + box[3]) / 2)
-                cv2.circle(frame, (cx, cy), 5, (0, 255, 255), -1)   # relleno amarillo
-                cv2.circle(frame, (cx, cy), 7, (0, 180, 180), 1)    # contorno
+                cv2.circle(frame, (cx, cy), 5, (0, 255, 255), -1)
+                cv2.circle(frame, (cx, cy), 7, (0, 180, 180), 1)
 
         # FPS
         elapsed = time.perf_counter() - t_start
@@ -212,6 +248,18 @@ class PersonCounter:
 
         return frame
 
+    def _update_fov_count(self, detections):
+        """Registra IDs nuevos y actualiza fov_count (modo campo de vision).
+
+        Cada ID de tracker que aparece por primera vez desde el ultimo reset
+        representa una persona unica detectada. El conteo es monotonicamente
+        creciente: nunca baja aunque la persona salga del cuadro.
+        """
+        if detections.tracker_id is not None:
+            for tid in detections.tracker_id:
+                self._seen_ids.add(tid)
+        self.fov_count = self._fov_offset + len(self._seen_ids)
+
     def _check_interval(self):
         """Registra datos cada 15 minutos."""
         now = time.time()
@@ -219,22 +267,32 @@ class PersonCounter:
             self._last_interval_time = now
             return
         if now - self._last_interval_time >= 15 * 60:
-            in_interval = self.in_count - self._interval_in_start
-            out_interval = self.out_count - self._interval_out_start
             hora_str = datetime.now().strftime("%H:%M")
-            self.interval_data.append(
-                (hora_str, in_interval, out_interval, self.in_count, self.out_count)
-            )
-            # Actualizar datos por hora
             hora = datetime.now().hour
-            self.hourly_entries[hora] = self.hourly_entries.get(hora, 0) + in_interval
-            self._interval_in_start = self.in_count
-            self._interval_out_start = self.out_count
+
+            if self.counting_mode == "fov":
+                fov_interval = self.fov_count - self._interval_fov_start
+                self.interval_data.append(
+                    (hora_str, fov_interval, 0, self.fov_count, 0)
+                )
+                self.hourly_entries[hora] = self.hourly_entries.get(hora, 0) + fov_interval
+                self._interval_fov_start = self.fov_count
+                logger.info("Intervalo FOV: %s | Personas: %d", hora_str, fov_interval)
+            else:
+                in_interval = self.in_count - self._interval_in_start
+                out_interval = self.out_count - self._interval_out_start
+                self.interval_data.append(
+                    (hora_str, in_interval, out_interval, self.in_count, self.out_count)
+                )
+                self.hourly_entries[hora] = self.hourly_entries.get(hora, 0) + in_interval
+                self._interval_in_start = self.in_count
+                self._interval_out_start = self.out_count
+                logger.info(
+                    "Intervalo linea: %s | Entradas: %d | Salidas: %d",
+                    hora_str, in_interval, out_interval,
+                )
+
             self._last_interval_time = now
-            logger.info(
-                "Intervalo registrado: %s | Entradas: %d | Salidas: %d",
-                hora_str, in_interval, out_interval,
-            )
 
     def reset_counters(self):
         """Reinicia todos los contadores y el tracker."""
@@ -242,9 +300,13 @@ class PersonCounter:
         self.out_count = 0
         self._in_offset = 0
         self._out_offset = 0
+        self.fov_count = 0
+        self._fov_offset = 0
+        self._seen_ids = set()
         self.persons_in_frame = 0
         self._interval_in_start = 0
         self._interval_out_start = 0
+        self._interval_fov_start = 0
         self._last_interval_time = time.time()
         self.interval_data.clear()
         self.hourly_entries.clear()
@@ -255,21 +317,40 @@ class PersonCounter:
         logger.info("Contadores reiniciados.")
 
     def export_csv(self, filepath: str):
-        """Exporta los datos a un archivo CSV."""
-        # Incluir intervalo parcial actual
+        """Exporta los datos a un archivo CSV.
+
+        El esquema de columnas varia segun el modo activo:
+          - linea: hora | entradas_intervalo | salidas_intervalo | entradas_total | salidas_total
+          - fov:   hora | personas_intervalo | personas_total
+        """
         data = list(self.interval_data)
-        in_partial = self.in_count - self._interval_in_start
-        out_partial = self.out_count - self._interval_out_start
-        if in_partial > 0 or out_partial > 0:
-            hora_str = datetime.now().strftime("%H:%M")
-            data.append((hora_str, in_partial, out_partial, self.in_count, self.out_count))
 
         with open(filepath, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(["hora", "entradas_intervalo", "salidas_intervalo",
-                             "entradas_total", "salidas_total"])
-            writer.writerows(data)
-        logger.info("CSV exportado: %s (%d filas)", filepath, len(data))
+
+            if self.counting_mode == "fov":
+                # Agregar intervalo parcial final
+                fov_partial = self.fov_count - self._interval_fov_start
+                if fov_partial > 0:
+                    hora_str = datetime.now().strftime("%H:%M")
+                    data.append((hora_str, fov_partial, 0, self.fov_count, 0))
+
+                writer.writerow(["hora", "personas_intervalo", "personas_total"])
+                for row in data:
+                    writer.writerow([row[0], row[1], row[3]])
+            else:
+                # Agregar intervalo parcial final
+                in_partial = self.in_count - self._interval_in_start
+                out_partial = self.out_count - self._interval_out_start
+                if in_partial > 0 or out_partial > 0:
+                    hora_str = datetime.now().strftime("%H:%M")
+                    data.append((hora_str, in_partial, out_partial, self.in_count, self.out_count))
+
+                writer.writerow(["hora", "entradas_intervalo", "salidas_intervalo",
+                                 "entradas_total", "salidas_total"])
+                writer.writerows(data)
+
+        logger.info("CSV exportado: %s (%d filas, modo=%s)", filepath, len(data), self.counting_mode)
 
 
 # ===========================================================================
@@ -413,9 +494,29 @@ class CounterApp(tk.Tk):
         config_frame.pack(fill="x", padx=5, pady=(0, 5))
 
         cfg_lbl = {"bg": "#2b2b2b", "fg": "#cccccc", "font": ("Segoe UI", 9), "anchor": "w"}
+        radio_style = {"bg": "#2b2b2b", "fg": "white", "selectcolor": "#444444",
+                       "font": ("Segoe UI", 9), "activebackground": "#2b2b2b",
+                       "activeforeground": "white"}
+
+        # --- Modo de conteo ---
+        tk.Label(config_frame, text="Modo de conteo:", **cfg_lbl).pack(fill="x", padx=8, pady=(5, 0))
+        mode_frame = tk.Frame(config_frame, bg="#2b2b2b")
+        mode_frame.pack(fill="x", padx=8, pady=(2, 5))
+        self.mode_var = tk.StringVar(value="line")
+        tk.Radiobutton(
+            mode_frame, text="\u2014  Cruce de linea", variable=self.mode_var,
+            value="line", command=self._on_mode_change, **radio_style,
+        ).pack(side="left", padx=(0, 8))
+        tk.Radiobutton(
+            mode_frame, text="\u25A1  Campo de vision", variable=self.mode_var,
+            value="fov", command=self._on_mode_change, **radio_style,
+        ).pack(side="left")
+
+        # Separador visual entre modo y resto de config
+        tk.Frame(config_frame, bg="#444444", height=1).pack(fill="x", padx=8, pady=(0, 4))
 
         # Camara
-        tk.Label(config_frame, text="Camara:", **cfg_lbl).pack(fill="x", padx=8, pady=(5, 0))
+        tk.Label(config_frame, text="Camara:", **cfg_lbl).pack(fill="x", padx=8, pady=(2, 0))
         self.camera_var = tk.IntVar(value=0)
         cam_combo = ttk.Combobox(
             config_frame, textvariable=self.camera_var, values=[0, 1, 2, 3, 4],
@@ -435,8 +536,9 @@ class CounterApp(tk.Tk):
         )
         self.slider_conf.pack(padx=8)
 
-        # Slider posicion linea
-        tk.Label(config_frame, text="Posicion linea:", **cfg_lbl).pack(fill="x", padx=8, pady=(5, 0))
+        # Slider posicion linea (solo relevante en modo linea)
+        self._lbl_line_pos = tk.Label(config_frame, text="Posicion linea:", **cfg_lbl)
+        self._lbl_line_pos.pack(fill="x", padx=8, pady=(5, 0))
         self.line_pos_var = tk.DoubleVar(value=0.7)
         self.slider_line = tk.Scale(
             config_frame, from_=0.0, to=1.0, resolution=0.05, orient="horizontal",
@@ -446,22 +548,22 @@ class CounterApp(tk.Tk):
         )
         self.slider_line.pack(padx=8)
 
-        # Orientacion
-        tk.Label(config_frame, text="Orientacion linea:", **cfg_lbl).pack(fill="x", padx=8, pady=(5, 0))
+        # Orientacion (solo relevante en modo linea)
+        self._lbl_orientation = tk.Label(config_frame, text="Orientacion linea:", **cfg_lbl)
+        self._lbl_orientation.pack(fill="x", padx=8, pady=(5, 0))
         orient_frame = tk.Frame(config_frame, bg="#2b2b2b")
         orient_frame.pack(fill="x", padx=8, pady=(0, 5))
         self.orientation_var = tk.StringVar(value="horizontal")
-        radio_style = {"bg": "#2b2b2b", "fg": "white", "selectcolor": "#444444",
-                       "font": ("Segoe UI", 9), "activebackground": "#2b2b2b",
-                       "activeforeground": "white"}
-        tk.Radiobutton(
+        self._rb_horizontal = tk.Radiobutton(
             orient_frame, text="Horizontal", variable=self.orientation_var,
             value="horizontal", command=self._on_line_change, **radio_style,
-        ).pack(side="left", padx=(0, 10))
-        tk.Radiobutton(
+        )
+        self._rb_horizontal.pack(side="left", padx=(0, 10))
+        self._rb_vertical = tk.Radiobutton(
             orient_frame, text="Vertical", variable=self.orientation_var,
             value="vertical", command=self._on_line_change, **radio_style,
-        ).pack(side="left")
+        )
+        self._rb_vertical.pack(side="left")
 
         # Grafico de trafico
         chart_frame = tk.LabelFrame(
@@ -572,6 +674,32 @@ class CounterApp(tk.Tk):
     def _on_line_change(self, _val=None):
         """Actualiza posicion y orientacion de la linea en vivo."""
         self.counter.update_line(self.line_pos_var.get(), self.orientation_var.get())
+
+    def _on_mode_change(self):
+        """Cambia el modo de conteo y ajusta la GUI en consecuencia."""
+        mode = self.mode_var.get()
+        self.counter.set_mode(mode)
+
+        if mode == "fov":
+            # Deshabilitar controles exclusivos del modo linea
+            self.slider_line.configure(state="disabled", troughcolor="#333333")
+            self._rb_horizontal.configure(state="disabled")
+            self._rb_vertical.configure(state="disabled")
+            self._lbl_line_pos.configure(fg="#555555")
+            self._lbl_orientation.configure(fg="#555555")
+            # Actualizar etiqueta de estadisticas
+            self.lbl_entradas.configure(text="PERSONAS:  0", fg="#44bbff")
+            self.lbl_salidas.configure(text="SALIDAS:   N/A", fg="#555555")
+        else:
+            # Rehabilitar controles de linea
+            self.slider_line.configure(state="normal", troughcolor="#555555")
+            self._rb_horizontal.configure(state="normal")
+            self._rb_vertical.configure(state="normal")
+            self._lbl_line_pos.configure(fg="#cccccc")
+            self._lbl_orientation.configure(fg="#cccccc")
+            # Restaurar etiquetas originales
+            self.lbl_entradas.configure(text="ENTRADAS:  0", fg="#00ff88")
+            self.lbl_salidas.configure(text="SALIDAS:   0", fg="#ff6644")
 
     # -----------------------------------------------------------------------
     # Hilo de video
@@ -738,10 +866,14 @@ class CounterApp(tk.Tk):
         self.after(self.UPDATE_MS, self._update_gui)
 
     def _update_stats_labels(self):
-        """Actualiza las etiquetas de estadisticas."""
+        """Actualiza las etiquetas de estadisticas segun el modo activo."""
         c = self.counter
-        self.lbl_entradas.configure(text=f"ENTRADAS:  {c.in_count}")
-        self.lbl_salidas.configure(text=f"SALIDAS:   {c.out_count}")
+        if c.counting_mode == "fov":
+            self.lbl_entradas.configure(text=f"PERSONAS:  {c.fov_count}")
+            self.lbl_salidas.configure(text="SALIDAS:   N/A")
+        else:
+            self.lbl_entradas.configure(text=f"ENTRADAS:  {c.in_count}")
+            self.lbl_salidas.configure(text=f"SALIDAS:   {c.out_count}")
         self.lbl_en_cuadro.configure(text=f"EN CUADRO:  {c.persons_in_frame}")
         self.lbl_fps.configure(text=f"FPS: {c.fps:.1f}")
 

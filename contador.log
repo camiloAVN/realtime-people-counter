@@ -496,3 +496,65 @@ AttributeError: property 'in_count' of 'LineZone' object has no setter
 2026-02-20 17:48:42,053 [INFO] Hilo de video finalizado.
 2026-02-20 17:48:49,489 [INFO] Cerrando aplicacion...
 2026-02-20 17:48:49,521 [INFO] Aplicacion cerrada.
+2026-02-21 10:19:22,429 [INFO] Cargando modelo YOLO: yolov8s.pt
+2026-02-21 10:19:22,429 [INFO] Aplicacion iniciada.
+2026-02-21 10:19:22,535 [INFO] Modelo cargado correctamente.
+2026-02-21 10:19:26,699 [INFO] Deteccion iniciada (camara 0).
+2026-02-21 10:19:27,405 [INFO] Camara 0 abierta con backend DSHOW.
+2026-02-21 10:20:39,187 [INFO] Deteccion detenida.
+2026-02-21 10:20:39,505 [INFO] Hilo de video finalizado.
+2026-02-21 10:24:22,439 [INFO] CSV exportado: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv (1 filas)
+2026-02-21 10:24:22,440 [INFO] Auto-guardado: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv
+2026-02-21 10:29:22,440 [INFO] CSV exportado: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv (1 filas)
+2026-02-21 10:29:22,441 [INFO] Auto-guardado: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv
+2026-02-21 10:29:37,551 [INFO] Cerrando aplicacion...
+2026-02-21 10:29:37,552 [INFO] CSV exportado: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv (1 filas)
+2026-02-21 10:29:37,552 [INFO] Datos guardados al cerrar: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv
+2026-02-21 10:29:37,602 [INFO] Aplicacion cerrada.
+2026-02-21 10:29:56,317 [INFO] Cargando modelo YOLO: yolov8s.pt
+2026-02-21 10:29:56,317 [INFO] Aplicacion iniciada.
+2026-02-21 10:29:56,382 [INFO] Modelo cargado correctamente.
+2026-02-21 10:29:58,389 [INFO] Deteccion iniciada (camara 0).
+2026-02-21 10:29:59,082 [INFO] Camara 0 abierta con backend DSHOW.
+2026-02-21 10:30:53,157 [INFO] CSV exportado: C:/Users/camil/Downloads/conteo_2026-02-21_103046.csv (1 filas)
+2026-02-21 10:32:11,900 [INFO] Deteccion detenida.
+2026-02-21 10:32:12,242 [INFO] Hilo de video finalizado.
+2026-02-21 10:34:56,321 [INFO] CSV exportado: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv (1 filas)
+2026-02-21 10:34:56,321 [INFO] Auto-guardado: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv
+2026-02-21 10:39:56,332 [INFO] CSV exportado: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv (1 filas)
+2026-02-21 10:39:56,333 [INFO] Auto-guardado: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv
+2026-02-21 10:44:56,335 [INFO] CSV exportado: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv (1 filas)
+2026-02-21 10:44:56,335 [INFO] Auto-guardado: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv
+2026-02-21 10:44:56,626 [INFO] Cerrando aplicacion...
+2026-02-21 10:44:56,626 [INFO] CSV exportado: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv (1 filas)
+2026-02-21 10:44:56,626 [INFO] Datos guardados al cerrar: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv
+2026-02-21 10:44:56,713 [INFO] Aplicacion cerrada.
+2026-02-21 10:45:03,437 [INFO] Cargando modelo YOLO: yolov8s.pt
+2026-02-21 10:45:03,437 [INFO] Aplicacion iniciada.
+2026-02-21 10:45:03,498 [INFO] Modelo cargado correctamente.
+2026-02-21 10:45:10,787 [INFO] Deteccion iniciada (camara 0).
+2026-02-21 10:45:11,503 [INFO] Camara 0 abierta con backend DSHOW.
+2026-02-21 10:47:17,718 [INFO] Deteccion detenida.
+2026-02-21 10:47:18,029 [INFO] Hilo de video finalizado.
+2026-02-21 10:47:18,775 [INFO] Cerrando aplicacion...
+2026-02-21 10:47:18,894 [INFO] Aplicacion cerrada.
+2026-02-21 11:03:35,147 [INFO] Modo de conteo cambiado a: fov
+2026-02-21 11:03:35,147 [INFO] Modo de conteo cambiado a: line
+2026-02-21 11:04:26,121 [INFO] Cargando modelo YOLO: yolov8s.pt
+2026-02-21 11:04:26,121 [INFO] Aplicacion iniciada.
+2026-02-21 11:04:26,200 [INFO] Modelo cargado correctamente.
+2026-02-21 11:04:28,283 [INFO] Deteccion iniciada (camara 0).
+2026-02-21 11:04:28,979 [INFO] Camara 0 abierta con backend DSHOW.
+2026-02-21 11:05:03,776 [INFO] Modo de conteo cambiado a: fov
+2026-02-21 11:07:18,460 [INFO] Deteccion detenida.
+2026-02-21 11:07:18,876 [INFO] Hilo de video finalizado.
+2026-02-21 11:07:22,734 [INFO] CSV exportado: C:/Users/camil/Downloads/conteo_2026-02-21_110719.csv (1 filas, modo=fov)
+2026-02-21 11:08:22,110 [INFO] Modo de conteo cambiado a: line
+2026-02-21 11:08:22,943 [INFO] Deteccion iniciada (camara 0).
+2026-02-21 11:08:23,635 [INFO] Camara 0 abierta con backend DSHOW.
+2026-02-21 11:08:53,216 [INFO] Deteccion detenida.
+2026-02-21 11:08:53,543 [INFO] Hilo de video finalizado.
+2026-02-21 11:08:58,312 [INFO] Cerrando aplicacion...
+2026-02-21 11:08:58,313 [INFO] CSV exportado: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv (1 filas, modo=line)
+2026-02-21 11:08:58,313 [INFO] Datos guardados al cerrar: c:\Users\camil\Documents\PROYECTOS\CONTADOR_PERSONAS\conteo_2026-02-21.csv
+2026-02-21 11:08:58,411 [INFO] Aplicacion cerrada.
